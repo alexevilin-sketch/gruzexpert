@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>👑 ТЕРМИНАЛ АДМИНИСТРАТОРА</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { 
+            background: #000000; 
+            color: #00ff00; 
+            font-family: 'Courier New', Courier, monospace;
+            padding: 20px;
+        }
+        .container { max-width:1600px; margin:0 auto; }
+        
+        .terminal-header { 
+            border-bottom: 2px solid #00ff00; 
+            padding:20px 0; 
+            margin-bottom:30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .terminal-header h1 { font-size: 36px; letter-spacing: 3px; }
+        .logout-btn { 
+            color: #00ff00; 
+            text-decoration: none;
+            border: 2px solid #00ff00;
+            padding: 10px 20px;
+        }
+        
+        .stats-grid { 
+            display: grid;
+            grid-template-columns: repeat(4,1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .stat-card { 
+            border: 2px solid #00ff00;
+            padding: 20px;
+            background: rgba(0,255,0,0.03);
+        }
+        .stat-card .label { opacity: 0.7; font-size: 14px; }
+        .stat-card .value { font-size: 32px; font-weight: bold; margin-top: 10px; }
+        
+        .charts-grid { 
+            display: grid;
+            grid-template-columns: repeat(2,1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .chart-container { 
+            border: 2px solid #00ff00;
+            padding: 20px;
+            background: rgba(0,255,0,0.03);
+        }
+        
+        .table-container { 
+            border: 2px solid #00ff00;
+            padding: 20px;
+            overflow-x: auto;
+        }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+        }
+        th { 
+            border-bottom: 2px solid #00ff00;
+            padding: 12px;
+            text-align: left;
+        }
+        td { 
+            padding: 12px;
+            border-bottom: 1px solid rgba(0,255,0,0.3);
+        }
+        
+        .status-select, .cost-input {
+            background: #111;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 5px;
+            font-family: 'Courier New';
+        }
+        
+        .update-btn {
+            background: #000;
+            color: #00ff00;
+            border: 2px solid #00ff00;
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+        .update-btn:hover {
+            background: #00ff00;
+            color: #000;
+        }
+        
+        .source-badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border: 1px solid #00ff00;
+            font-size: 12px;
+        }
+        .source-telegram { color: #0088cc; }
+        .source-website { color: #00ff00; }
+        
+        .summary { 
+            border: 2px solid #00ff00;
+            padding: 20px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="terminal-header">
+        <h1>👑 ТЕРМИНАЛ АДМИНИСТРАТОРА</h1>
+        <a href="/logout" class="logout-btn">> ВЫЙТИ</a>
+    </div>
+    
+    <div class="stats-grid" id="statsGrid"></div>
+    
+    <div class="charts-grid">
+        <div class="chart-container">
+            <h3>📊 ЗАКАЗЫ ПО ИСТОЧНИКАМ</h3>
+            <canvas id="sourceChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <h3>📈 ДИНАМИКА ЗАКАЗОВ</h3>
+            <canvas id="trendChart"></canvas>
+        </div>
+    </div>
+    
+    <div class="table-container">
+        <h2 style="margin-bottom:20px;">📋 ВСЕ ЗАКАЗЫ</h2>
+        <table id="ordersTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>ИСТ</th>
+                    <th>ДАТА</th>
+                    <th>КЛИЕНТ</th>
+                    <th>ТЕЛЕФОН</th>
+                    <th>УСЛУГА</th>
+                    <th>АДРЕС</th>
+                    <th>ДАТА РАБОТ</th>
+                    <th>РАБ/ЧАС</th>
+                    <th>РАБОЧИЙ</th>
+                    <th>СТАТУС</th>
+                    <th>СТОИМОСТЬ</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+    
+    <div class="summary" id="summary"></div>
+</div>
+
+<script>
+let sourceChart, trendChart;
+
+function loadStats() {
+    fetch('/api/admin/stats')
+        .then(r => r.json())
+        .then(s => {
+            document.getElementById('statsGrid').innerHTML = `
+                <div class="stat-card">
+                    <div class="label">ВСЕГО ЗАКАЗОВ</div>
+                    <div class="value">${s.total_orders}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">TELEGRAM</div>
+                    <div class="value">${s.telegram_orders}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">САЙТ</div>
+                    <div class="value">${s.website_orders}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="label">ВЫРУЧКА</div>
+                    <div class="value">€${s.total_revenue}</div>
+                </div>
+            `;
+            
+            if (sourceChart) sourceChart.destroy();
+            sourceChart = new Chart(document.getElementById('sourceChart'), {
+                type: 'pie',
+                data: {
+                    labels: ['TELEGRAM', 'САЙТ'],
+                    datasets: [{
+                        data: [s.telegram_orders, s.website_orders],
+                        backgroundColor: ['#0088cc', '#00ff00']
+                    }]
+                }
+            });
+        });
+}
+
+function loadOrders() {
+    fetch('/api/admin/orders')
+        .then(r => r.json())
+        .then(orders => {
+            let tbody = document.querySelector('#ordersTable tbody');
+            tbody.innerHTML = '';
+            
+            let totalSum = 0;
+            
+            orders.forEach(o => {
+                totalSum += o.final_cost || 0;
+                
+                let row = tbody.insertRow();
+                let sourceClass = o.source === 'website' ? 'source-website' : 'source-telegram';
+                let sourceText = o.source === 'website' ? '🌐' : '📱';
+                
+                row.innerHTML = `
+                    <td>#${o.id}</td>
+                    <td><span class="source-badge ${sourceClass}">${sourceText}</span></td>
+                    <td>${new Date(o.created_at).toLocaleDateString()}</td>
+                    <td>${o.customer_name}</td>
+                    <td>${o.customer_phone}</td>
+                    <td>${o.service_type}</td>
+                    <td>${o.address}</td>
+                    <td>${o.scheduled_date || ''} ${o.scheduled_time || ''}</td>
+                    <td>${o.workers_count}/${o.estimated_hours}</td>
+                    <td>${o.worker_name || '—'}</td>
+                    <td>
+                        <select class="status-select" onchange="updateOrder(${o.id}, 'status', this.value)">
+                            <option value="pending" ${o.status=='pending'?'selected':''}>⏳ ОЖИДАЕТ</option>
+                            <option value="assigned" ${o.status=='assigned'?'selected':''}>👷 НАЗНАЧЕН</option>
+                            <option value="in_progress" ${o.status=='in_progress'?'selected':''}>🚚 В РАБОТЕ</option>
+                            <option value="completed" ${o.status=='completed'?'selected':''}>✅ ВЫПОЛНЕН</option>
+                        </select>
+                    </td>
+                    <td>
+                        <input type="number" class="cost-input" id="cost_${o.id}" value="${o.final_cost}" step="0.01" min="0" style="width:80px;">
+                        <button class="update-btn" onclick="updateCost(${o.id})">💾</button>
+                    </td>
+                `;
+            });
+            
+            document.getElementById('summary').innerHTML = `
+                <h3>📊 ИТОГИ:</h3>
+                <p>ВСЕГО ЗАКАЗОВ: ${orders.length}</p>
+                <p>ОБЩАЯ ВЫРУЧКА: €${totalSum.toFixed(2)}</p>
+            `;
+        });
+}
+
+function updateOrder(orderId, field, value) {
+    fetch('/api/admin/update-order', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({order_id: orderId, field: field, value: value})
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            loadStats();
+            loadOrders();
+        }
+    });
+}
+
+function updateCost(orderId) {
+    let cost = document.getElementById(`cost_${orderId}`).value;
+    updateOrder(orderId, 'final_cost', cost);
+}
+
+loadStats();
+loadOrders();
+setInterval(loadStats, 30000);
+</script>
+</body>
+</html>

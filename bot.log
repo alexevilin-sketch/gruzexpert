@@ -1,0 +1,4 @@
+Traceback (most recent call last):
+  File "/home/xania/Documents/gruzexpert_new/bot.py", line 8, in <module>
+    from aiogram import Bot, Dispatcher, types, F
+ModuleNotFoundError: No module named 'aiogram'

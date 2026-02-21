@@ -1,0 +1,4 @@
+  File "/home/xania/Documents/gruzexpert_new/website.py", line 21
+    .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+                               ^
+SyntaxError: invalid decimal literal
